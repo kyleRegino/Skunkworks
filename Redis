@@ -1,0 +1,117 @@
+## Redis
+
+Load data on premise
+```
+cat downloaded.csv | awk -F',' '{print " SET \""$1"\" \""$0"\" \n"}' | redis-cli --pipe 
+```
+
+Python file <code>redis.py</code>
+
+Import dependencies
+
+```python
+import pandas as pd
+import memcache
+```
+
+Read the data using pandas ( data consists of 500,000 rows and 8 columns )
+```
+df = pd.read_json('downloaded.json')
+```
+
+Create <code>clean_data</code> function to assign each columns to <code>data</code> dictionary, use the <i>column names</i> as key and <i>row values</i> as corresponding values to that key.
+
+Example:
+
+From this table,
+<table>
+    <tr>
+        <th>pickup</th>
+        <th>dropoff</th>
+        <th>trip_distance</th>
+        <th>...</th>
+    </tr>
+    <tr>
+        <td>value11</td>
+        <td>value12</td>
+        <td>value13</td>
+        <td>...</td>
+    </tr>
+    <tr>
+        <td>value21</td>
+        <td>value22</td>
+        <td>value23</td>
+        <td>...</td>
+    </tr>
+</table>
+
+To dictionary format,
+
+<code>data = { 'pickup' : ['value11', 'value21'], 'dropoff' : ['value12', 'value22'], 'trip_distance':['value13', 'value23], ...}</code>
+
+```python
+columns = ['pickup', 'dropoff', 'trip_distance', 'fare_amount', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude', 'dropoff_latitude']
+
+def clean_data(df):
+    test_data = {}
+    for column in columns:
+        test_data[column] = list(df[column])
+    print('test_data consist of %d keys' %len(data))
+    return test_data
+```
+Now, let's setup our memcache client. For now, it is hosted in my local machine. Set <code>debug = 1</code> to show error if has.
+
+```python
+mc = memcache.Client(['127.0.0.1:11211'], debug=1)
+```
+
+Iterate through each keys and values on <code>test_data</code> and store it to memory by using our previously created memcached client.
+
+```python
+for key in data:
+    mc.set(key, data[key])
+```
+This error prompted when running the script above
+<code>MemCached: while expecting 'STORED', got unexpected response 'SERVER_ERROR object too large for cache'
+MemCached: while expecting 'STORED', got unexpected response 'SERVER_ERROR object too large for cache'</code>
+
+In memcached, there is a certain limit especially when storing massive amount of data. Based on this <a href="https://stackoverflow.com/questions/1440722/maximum-size-of-object-that-can-be-saved-in-memcached-with-memcache-py/11730559">link</a>, the maximum allowable size for every key in memcached is only 1 megabyte. However, the overall size of data that we are trying to store is roughly 40 mb and divided into 8 columns, which is approximately equivalent to 8mb per column/key. This is the reason why we are encountering this error <code>MemCached: while expecting 'STORED', got unexpected response 'SERVER_ERROR object too large for cache'</code>.
+
+Reducing the data to create 50,000 rows.
+```python
+# Get the first 50k rows
+df = df.head(50000)
+```
+
+Run again the <code>clean_data</code> function
+```python
+test_data = clean_data(df)
+```
+
+#### Set
+Measure the time of storing the data to memcached
+```python
+import time
+
+start_time = time.time()
+for key in test_data:
+    mc.set(key, test_data[key])
+end_time = time.time()
+
+total_set_time = end_time - start_time
+print("Total time consumed: %f" %total_set_time+" seconds.")
+```
+Total time consumed: 0.175538 seconds.
+
+#### Get
+Now, test our query time by getting all values from every key in memcached.
+```python
+start_time = time.time()
+for key in test_data:
+    mc.get(key)
+end_time = time.time()
+
+total_get_time = end_time - start_time
+print("Total time consumed: %f" %total_get_time+" seconds")
+```
+Total time consumed: 0.208443 seconds
