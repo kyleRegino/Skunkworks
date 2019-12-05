@@ -8,7 +8,6 @@ cat downloaded.csv | awk -F',' '{print " SET \""$1"\" \""$0"\" \n"}' | redis-cli
 Python file <code>redis.py</code>
 
 ```python
-import redis
 
 import redis
 import time
