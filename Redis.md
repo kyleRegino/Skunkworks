@@ -1,6 +1,8 @@
 # Skunkworks -Redis
+App Server - used as data storage
+DB Server - used to perform reading of data from app server
 
-Load data on premise using <code>import_csv.py</code>
+Load data from DB server to App Server using <code>import_csv.py</code>
 ```python
 import csv
 import redis
@@ -86,7 +88,7 @@ with open('redis_import_logs.csv', mode='a') as file:
 
 ```
 
-Read file using python file <code>redis.py</code>
+Read file using python file <code>redis.py</code> in DB server
 
 ```python
 import redis
